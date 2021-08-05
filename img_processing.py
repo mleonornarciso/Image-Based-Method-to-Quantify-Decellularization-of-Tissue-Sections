@@ -4,10 +4,7 @@ from scipy.ndimage.measurements import label
 from skimage.filters.rank import entropy
 from skimage.morphology import disk
 from skimage import exposure
-from skimage.filters import threshold_yen, threshold_otsu, threshold_mean
-#from time import time
-
-#from scipy import ndimage
+from skimage.filters import threshold_yen
 
 def rgb2gray(rgb_img):
 	"""
@@ -16,74 +13,6 @@ def rgb2gray(rgb_img):
 	gray = (0.3*rgb_img[:,:,0])+(0.59*rgb_img[:,:,1])+(0.11*rgb_img[:,:,2])
 
 	return gray
-
-def gray2rgb(gray_img):
-	"""
-	Convert image from grayscale to rgb 
-	"""
-	(N,M)=gray_img.shape
-	
-	out = np.zeros((N,M,3))
-	out[:,:,0] = gray_img
-	out[:,:,1] = gray_img
-	out[:,:,2] = gray_img
-
-	return out.astype(np.int)
-	
-def bg_correct (rgb_img):
-
-	#normalize the images (switch rgb_img for img)
-	#norm_img = np.zeros(img.shape)
-	#rgb_img = cv2.normalize(img,  norm_img, 0, 255, cv2.NORM_MINMAX)
-
-	n_row, n_col = rgb_img.shape
-	med_row=np.zeros(n_row)
-	med_col=np.zeros(n_col)
-	rgb_img2=np.zeros(rgb_img.shape)
-
-	#calcular as medianas para cada linha e coluna
-	for i in range(n_row):
-	    med_row[i] = np.median(rgb_img[i,:])
-	for j in range(n_col):
-	    med_col[j] = np.median(rgb_img[:,j])
-
-	#expandir as dimensoes dos vetores porque senao a funcao repeat nao funciona
-	med_row = np.expand_dims(med_row, axis=0)
-	med_col = np.expand_dims(med_col, axis=0)
-
-	#repetir os valores das medianas ao longo das linhas
-	med_row_rp = np.repeat(med_row, n_col ,axis=0)
-	med_col_rp = np.repeat(med_col, n_row ,axis=0)
-
-	rgb_img2=(rgb_img-med_row_rp.transpose()-med_col_rp)
-	rgb_img3 = rgb_img2-np.amin(rgb_img2)+1
-
-	#for i in range(n_row):
-	#    for j in range(n_col):
-	#        rgb_img2[i,j] = rgb_img[i,j] -med_row[i]-med_col[j]
-	return rgb_img3
-
-def freq_filter (mask,width):
-	"""
-	Receive a mask and apply to it a low pass filter.
-	PERCEBER MELHOR ESTA FUNÇAO.
-	"""
-	dft = cv2.dft(np.float32(mask),flags = cv2.DFT_COMPLEX_OUTPUT)
-	dft_shift = np.fft.fftshift(dft)
-	mag_filtered= 20*np.log(cv2.magnitude(dft_shift[:,:,0],dft_shift[:,:,1]))
-
-	rows, cols = mask.shape
-	crow, ccol = rows//2 , cols//2
-	# create a mask first, center square is 1, remaining all zeros
-	mask2 = np.zeros((rows,cols,2),np.uint8)
-	mask2[crow-width:crow+width, ccol-width:ccol+width] = 1
-	# apply mask and inverse DFT
-	fshift = dft_shift*mask2
-	f_ishift = np.fft.ifftshift(fshift)
-	img_back = cv2.idft(f_ishift)
-	img_back = cv2.magnitude(img_back[:,:,0],img_back[:,:,1])
-
-	return img_back
 
 def average_intensity(masked_img, option, nb_pixels):
 
@@ -118,7 +47,6 @@ def find_mask_threshold(bf_img, lower_bound_1, upper_bound_1, lower_bound_2, upp
 	"""
 
 	bf_img_gs = rgb2gray(bf_img)
-	#changed by Maria: 13/10
 	bf_img_gs_corr=bg_correct(bf_img_gs)
 	mask =  np.logical_and(bf_img_gs_corr<upper_bound_1 , bf_img_gs_corr>lower_bound_1)
 	bf_img_gs_corr[mask] = 0 
@@ -131,11 +59,8 @@ def find_mask_threshold(bf_img, lower_bound_1, upper_bound_1, lower_bound_2, upp
 	img1[img1 != 1] = 0
 	
 	return bf_img_gs_corr.astype(np.int),img1.astype(np.int)
-	#o astype muda de floats para 1s e zerox. e nao é so isso! muda para inteiros. que é a unica cena que importa.
-	#e que faz com que possas aplicar as mascaras as imagens, disse o torron.
 
-def closing(mask,kernel,it):
-	#kernel=9,it=2
+def dil_er(mask,kernel,it):
 	"""
 	Dilation followed by an erosion. Transforms the input into uint8
 	Useful to disconnect holes that are have been brought together so
@@ -144,27 +69,10 @@ def closing(mask,kernel,it):
 	mask_i= mask.astype(np.uint8)
 	kernel_dil = disk(kernel)
 	kernel_er = disk(kernel)
-	#dilate and then erode. Repeats each process for the number of iterations, it
 	dilation = cv2.dilate(mask_i,kernel_dil,iterations = it)
 	erosion = cv2.erode(dilation,kernel_er,iterations = it+1)
 
 	return erosion
-
-#def closing(mask,kernel,it):
-	#kernel=9,it=2
-	"""
-	Dilation followed by an erosion. Transforms the input into uint8
-	Useful to disconnect holes that are have been brought together so
-	the labeling and hole removal works better. 
-	"""
-#	mask_i= mask.astype(np.uint8)
-#	kernel_dil = np.ones((kernel,kernel),np.uint8)
-#	kernel_er = np.ones((kernel,kernel),np.uint8)
-	#dilate and then erode. Repeats each process for the number of iterations, it
-#	dilation = cv2.dilate(mask_i,kernel_dil,iterations = it)
-#	erosion = cv2.erode(dilation,kernel_er,iterations = it)
-
-#	return erosion
 
 def invert_mask(mask):
     out = np.ones(mask.shape)
@@ -178,7 +86,7 @@ def mask_labeling(mask):
     labeled, ncomponents = label(mask, structure)
     return labeled, ncomponents
 
-def remove_small_blobs(labeled_mask,ncomponents,area):
+def remove_small_components(labeled_mask,ncomponents,area):
     
 	sizes=[]
 	labeled_mask_out = np.copy(labeled_mask)
