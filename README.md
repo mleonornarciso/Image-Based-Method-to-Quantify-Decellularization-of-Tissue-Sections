@@ -4,16 +4,19 @@ Full text: https://www.mdpi.com/1422-0067/22/16/8399
 For more information or questions, please contact mnarciso@ibecbarcelona.eu
 
 ## Summary
-This algorithm takes corresponding image pairs 
+The objective of this work is to quantify the DNA signal of native and decellularized tissue. The problem arises when the DNA signal image cannot be properly segmented due to high levels of decellularizetion (which in turn lead to low signal levels). To resolve this issue, we mask the phase contrast image and apply it to the corresponding uv image.
+This algorithm takes corresponding images (phase contrast + uv image) and uses an entropy filter to mask the phase contrast image. 
+This mask is improved with dilations, erosions, labeling and component selections. The final mask is applied to the uv image to obtain a value for the signal intensity of the uv image. 
 
 ## Repository content
-img_processing.py is the library where the functions are stored 
-pipeline.py is where experiments should be run
+img_processing.py is the library where the functions are stored. 
+pipeline.py is where experiments should be run.
+We recommend the use of jupyter notebooks for pipeline.py for a better user experience.
 
 ## Instructions 
 The code uploaded is for a single image pair (pc contrast image + uv image). 
-We advise 
-
+Native and decellularized median signal intensities should both be computed to reach a decellularization % based on the difference of mean signal intensity.
+To analyse a full dataset of images, we advise the creation of a dictionary based on the different experimental conditions as well as the incorporation of a simple for loop to iterate between image pairs.
 
 ## Citations
 If you use this work, please cite:
