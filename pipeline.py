@@ -40,3 +40,4 @@ uv_intensity_masked, intensity_total, nb_pixels_uv = img_processing.average_inte
 bg_intensity, intensity_total_bg, nb_pixels_bg = img_processing.average_intensity(masked_bg,2,img_processing.invert_mask(mask).sum())
 #reach the final intensity by subtracting the background intensity
 final_avg_intensity = uv_intensity_masked-bg_intensity
+
